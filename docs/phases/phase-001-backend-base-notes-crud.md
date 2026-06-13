@@ -6,17 +6,17 @@ Dejar preparada la base del backend de CoachNotes con NestJS, Prisma y Supabase,
 
 Esta fase prioriza simplicidad y velocidad de captura. No incluye IA, adjuntos, transcripcion, generacion de sesiones ni auth completa.
 
-## Endpoints creados
+## Endpoints creados en esta fase
 
-Todos los endpoints trabajan sobre el recurso `notes`.
+Todos los endpoints trabajan sobre el recurso `notes`. En Phase 001 usaban `userId` temporal; desde Phase 002 el contrato actual usa `Authorization: Bearer <supabase_access_token>` y ya no acepta `userId` en body o query.
 
 | Metodo | Ruta | Descripcion |
 | --- | --- | --- |
-| `POST` | `/notes` | Crea una nota. Recibe `userId` temporal en el body. |
-| `GET` | `/notes?userId=...` | Lista notas no archivadas del usuario temporal. |
-| `GET` | `/notes/:id?userId=...` | Obtiene una nota concreta del usuario temporal. |
-| `PATCH` | `/notes/:id?userId=...` | Actualiza una nota. El `userId` temporal puede ir en query o body. |
-| `DELETE` | `/notes/:id?userId=...` | Elimina una nota del usuario temporal. |
+| `POST` | `/notes` | Crea una nota. |
+| `GET` | `/notes` | Lista notas no archivadas del usuario. |
+| `GET` | `/notes/:id` | Obtiene una nota concreta del usuario. |
+| `PATCH` | `/notes/:id` | Actualiza una nota. |
+| `DELETE` | `/notes/:id` | Elimina una nota. |
 
 ## Estructura del modulo notes
 
@@ -30,7 +30,7 @@ src/notes
   notes.service.ts
 ```
 
-El controlador expone la API HTTP. El servicio contiene la logica de acceso a datos y comprueba que cada operacion este acotada al `userId` temporal. Los DTOs usan `class-validator` para validar entradas basicas.
+El controlador expone la API HTTP. El servicio contiene la logica de acceso a datos y comprueba que cada operacion este acotada al usuario propietario. Los DTOs usan `class-validator` para validar entradas basicas.
 
 ## Prisma
 
@@ -46,11 +46,11 @@ src/prisma
 
 ## UserId temporal
 
-Hasta implementar Supabase Auth, la API recibe un `userId` temporal en body o query segun el endpoint. Esto existe solo para esta fase y sera sustituido por el usuario autenticado obtenido desde Supabase Auth en la siguiente fase.
+En Phase 001 la API recibia un `userId` temporal en body o query segun el endpoint. Desde Phase 002 esto queda retirado: los endpoints de `notes` usan el usuario autenticado obtenido desde el JWT de Supabase Auth.
 
 ## Limitaciones actuales
 
-- No hay guards de autenticacion.
+- Phase 001 no incluia guards de autenticacion; esto se implementa en Phase 002.
 - No se gestionan adjuntos ni Supabase Storage desde la API.
 - No hay analisis IA ni transcripcion de audio.
 - No hay generacion de sesiones.
@@ -58,7 +58,7 @@ Hasta implementar Supabase Auth, la API recibe un `userId` temporal en body o qu
 
 ## Proximos pasos
 
-- Integrar Supabase Auth y eliminar el `userId` temporal de requests.
+- Supabase Auth queda implementado en Phase 002.
 - Definir politicas de acceso definitivas entre backend, Supabase y RLS.
 - Agregar adjuntos sobre Supabase Storage.
 - Preparar enriquecimiento con IA sobre `note_ai_analysis`.

@@ -1,10 +1,5 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { isUUID } from 'class-validator';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateNoteDto } from './dto/create-note.dto';
 import { UpdateNoteDto } from './dto/update-note.dto';
@@ -13,10 +8,10 @@ import { UpdateNoteDto } from './dto/update-note.dto';
 export class NotesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(createNoteDto: CreateNoteDto) {
+  async create(userId: string, createNoteDto: CreateNoteDto) {
     const note = await this.prisma.notes.create({
       data: {
-        user_id: createNoteDto.userId,
+        user_id: userId,
         title: createNoteDto.title,
         raw_content: createNoteDto.rawContent,
         clean_content: createNoteDto.cleanContent,
@@ -30,10 +25,9 @@ export class NotesService {
   }
 
   async findAll(userId: string) {
-    const safeUserId = this.requireTemporaryUserId(userId);
     const notes = await this.prisma.notes.findMany({
       where: {
-        user_id: safeUserId,
+        user_id: userId,
         is_archived: false,
       },
       orderBy: {
@@ -45,18 +39,12 @@ export class NotesService {
   }
 
   async findOne(id: string, userId: string) {
-    const note = await this.findOwnedNoteOrThrow(
-      id,
-      this.requireTemporaryUserId(userId),
-    );
+    const note = await this.findOwnedNoteOrThrow(id, userId);
 
     return this.toResponse(note);
   }
 
-  async update(id: string, updateNoteDto: UpdateNoteDto, queryUserId?: string) {
-    const userId = this.requireTemporaryUserId(
-      queryUserId ?? updateNoteDto.userId,
-    );
+  async update(id: string, userId: string, updateNoteDto: UpdateNoteDto) {
     await this.findOwnedNoteOrThrow(id, userId);
 
     const data: Prisma.notesUpdateInput = {
@@ -96,7 +84,7 @@ export class NotesService {
   }
 
   async remove(id: string, userId: string) {
-    await this.findOwnedNoteOrThrow(id, this.requireTemporaryUserId(userId));
+    await this.findOwnedNoteOrThrow(id, userId);
     await this.prisma.notes.delete({
       where: { id },
     });
@@ -115,20 +103,6 @@ export class NotesService {
     }
 
     return note;
-  }
-
-  private requireTemporaryUserId(userId?: string) {
-    if (!userId) {
-      throw new BadRequestException(
-        'Temporary userId is required until Supabase Auth is enabled.',
-      );
-    }
-
-    if (!isUUID(userId)) {
-      throw new BadRequestException('userId must be a UUID');
-    }
-
-    return userId;
   }
 
   private toResponse(note: Prisma.notesGetPayload<object>) {

@@ -9,49 +9,56 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
-  Query,
+  Req,
+  UseGuards,
 } from '@nestjs/common';
+import type { AuthenticatedRequest } from '../auth/authenticated-request';
+import { SupabaseAuthGuard } from '../auth/supabase-auth.guard';
 import { CreateNoteDto } from './dto/create-note.dto';
 import { UpdateNoteDto } from './dto/update-note.dto';
 import { NotesService } from './notes.service';
 
+@UseGuards(SupabaseAuthGuard)
 @Controller('notes')
 export class NotesController {
   constructor(private readonly notesService: NotesService) {}
 
   @Post()
-  create(@Body() createNoteDto: CreateNoteDto) {
-    return this.notesService.create(createNoteDto);
+  create(
+    @Body() createNoteDto: CreateNoteDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.notesService.create(request.user.id, createNoteDto);
   }
 
   @Get()
-  findAll(@Query('userId') userId: string) {
-    return this.notesService.findAll(userId);
+  findAll(@Req() request: AuthenticatedRequest) {
+    return this.notesService.findAll(request.user.id);
   }
 
   @Get(':id')
   findOne(
     @Param('id', ParseUUIDPipe) id: string,
-    @Query('userId') userId: string,
+    @Req() request: AuthenticatedRequest,
   ) {
-    return this.notesService.findOne(id, userId);
+    return this.notesService.findOne(id, request.user.id);
   }
 
   @Patch(':id')
   update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateNoteDto: UpdateNoteDto,
-    @Query('userId') userId?: string,
+    @Req() request: AuthenticatedRequest,
   ) {
-    return this.notesService.update(id, updateNoteDto, userId);
+    return this.notesService.update(id, request.user.id, updateNoteDto);
   }
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   async remove(
     @Param('id', ParseUUIDPipe) id: string,
-    @Query('userId') userId: string,
+    @Req() request: AuthenticatedRequest,
   ) {
-    await this.notesService.remove(id, userId);
+    await this.notesService.remove(id, request.user.id);
   }
 }

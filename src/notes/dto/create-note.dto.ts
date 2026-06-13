@@ -1,16 +1,6 @@
-import {
-  IsBoolean,
-  IsNotEmpty,
-  IsOptional,
-  IsString,
-  IsUUID,
-} from 'class-validator';
+import { IsBoolean, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class CreateNoteDto {
-  // Temporary until Supabase Auth guards provide the authenticated user.
-  @IsUUID()
-  userId: string;
-
   @IsOptional()
   @IsString()
   title?: string | null;

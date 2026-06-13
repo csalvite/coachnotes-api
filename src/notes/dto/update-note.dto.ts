@@ -1,11 +1,6 @@
-import { IsBoolean, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsBoolean, IsOptional, IsString } from 'class-validator';
 
 export class UpdateNoteDto {
-  // Temporary until Supabase Auth guards provide the authenticated user.
-  @IsOptional()
-  @IsUUID()
-  userId?: string;
-
   @IsOptional()
   @IsString()
   title?: string | null;
