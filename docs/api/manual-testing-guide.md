@@ -31,7 +31,7 @@ Uso de cada variable:
 Variables locales recomendadas para probar con `curl`:
 
 ```bash
-API_URL="http://localhost:3000"
+API_URL="http://localhost:3001"
 SUPABASE_URL="https://your-project.supabase.co"
 SUPABASE_ANON_KEY="your-anon-key"
 EMAIL="coach@example.com"
