@@ -5,6 +5,7 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  IsUUID,
   Max,
   Min,
 } from 'class-validator';
@@ -35,6 +36,14 @@ export class GetNotesQueryDto {
   @IsOptional()
   @IsString()
   sourceType?: string;
+
+  @IsOptional()
+  @IsUUID()
+  tagId?: string;
+
+  @IsOptional()
+  @IsString()
+  tagName?: string;
 
   @IsOptional()
   @Transform(({ value }) => toBoolean(value))

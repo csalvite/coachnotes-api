@@ -134,6 +134,20 @@ export class NotesService {
       where.is_favorite = query.isFavorite;
     }
 
+    if (query.tagId || query.tagName) {
+      where.note_tags = {
+        some: {
+          tag_id: query.tagId,
+          tags: {
+            user_id: userId,
+            name: query.tagName
+              ? { contains: query.tagName.trim(), mode: 'insensitive' }
+              : undefined,
+          },
+        },
+      };
+    }
+
     if (query.from || query.to) {
       where.created_at = {
         gte: query.from,
