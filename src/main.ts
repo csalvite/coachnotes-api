@@ -22,7 +22,7 @@ async function bootstrap() {
   );
 
   const port = Number(process.env.PORT) || DEFAULT_PORT;
-  await app.listen(port);
+  await app.listen(port, '0.0.0.0');
   console.log(`CoachNotes API is running on http://localhost:${port}`);
 }
 void bootstrap();
