@@ -4,12 +4,14 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
-import type { JWTPayload } from 'jose';
-import { isUUID } from 'class-validator';
-import { AuthenticatedRequest } from './authenticated-request';
+import { createClient } from '@supabase/supabase-js';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import type { AuthenticatedRequest } from './authenticated-request';
 
 @Injectable()
 export class SupabaseAuthGuard implements CanActivate {
+  private supabase?: SupabaseClient;
+
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const token = this.extractBearerToken(request.headers.authorization);
@@ -18,17 +20,16 @@ export class SupabaseAuthGuard implements CanActivate {
       throw new UnauthorizedException('Missing bearer token');
     }
 
-    const payload = await this.verifyToken(token);
-    const userId = payload.sub;
+    const { data, error } = await this.getSupabase().auth.getUser(token);
+    const user = data.user;
 
-    if (!userId || !isUUID(userId)) {
-      throw new UnauthorizedException('Invalid authenticated user');
+    if (error || !user) {
+      throw new UnauthorizedException('Invalid or expired token');
     }
 
     request.user = {
-      id: userId,
-      email: this.optionalString(payload.email),
-      role: this.optionalString(payload.role),
+      id: user.id,
+      email: user.email,
     };
 
     return true;
@@ -39,25 +40,26 @@ export class SupabaseAuthGuard implements CanActivate {
     return type === 'Bearer' && token ? token : null;
   }
 
-  private async verifyToken(token: string): Promise<JWTPayload> {
-    const jwtSecret = process.env.SUPABASE_JWT_SECRET;
+  private getSupabase() {
+    if (this.supabase) {
+      return this.supabase;
+    }
 
-    if (!jwtSecret) {
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseKey =
+      process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !supabaseKey) {
       throw new UnauthorizedException('Supabase auth is not configured');
     }
 
-    try {
-      const { jwtVerify } = await import('jose');
-      const secret = new TextEncoder().encode(jwtSecret);
-      const { payload } = await jwtVerify(token, secret);
+    this.supabase = createClient(supabaseUrl, supabaseKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    });
 
-      return payload;
-    } catch {
-      throw new UnauthorizedException('Invalid or expired token');
-    }
-  }
-
-  private optionalString(value: unknown) {
-    return typeof value === 'string' ? value : undefined;
+    return this.supabase;
   }
 }

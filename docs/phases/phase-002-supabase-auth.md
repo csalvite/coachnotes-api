@@ -12,13 +12,16 @@ Los endpoints protegidos esperan el header:
 Authorization: Bearer <supabase_access_token>
 ```
 
-El backend verifica la firma y expiracion del JWT con `SUPABASE_JWT_SECRET`. El `sub` del token se usa como `userId` autenticado y se adjunta al request como `request.user.id`.
+El backend valida el token llamando a Supabase Auth con `supabase.auth.getUser(token)`. El `id` del usuario devuelto por Supabase se usa como `userId` autenticado y se adjunta al request como `request.user.id`.
 
-Variable requerida:
+Variables requeridas:
 
 ```text
-SUPABASE_JWT_SECRET=
+SUPABASE_URL=
+SUPABASE_SERVICE_ROLE_KEY=
 ```
+
+Si `SUPABASE_SERVICE_ROLE_KEY` no existe, el guard puede usar `SUPABASE_ANON_KEY`. La service role key es solo para backend y nunca debe usarse en frontend.
 
 ## Endpoints protegidos
 
@@ -41,7 +44,7 @@ src/auth
   supabase-auth.guard.ts
 ```
 
-`SupabaseAuthGuard` lee el token Bearer, valida el JWT y agrega el usuario autenticado al request. `NotesController` usa ese usuario para llamar a `NotesService`.
+`SupabaseAuthGuard` lee el token Bearer, lo valida contra Supabase Auth y agrega el usuario autenticado al request. `NotesController` usa ese usuario para llamar a `NotesService`.
 
 ## Cambios sobre notes
 
@@ -56,7 +59,7 @@ src/auth
 - No se implementa IA.
 - No se implementa transcripcion.
 - No se implementa frontend.
-- El guard verifica JWT localmente con el secreto configurado; si se cambia la estrategia de firma de Supabase, habra que revisar esta verificacion.
+- El guard depende de Supabase Auth para validar tokens, por lo que requiere conectividad con Supabase.
 
 ## Proximos pasos
 

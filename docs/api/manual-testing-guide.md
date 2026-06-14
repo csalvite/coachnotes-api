@@ -14,7 +14,6 @@ DIRECT_URL=
 SUPABASE_URL=
 SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
-SUPABASE_JWT_SECRET=
 ```
 
 Uso de cada variable:
@@ -25,8 +24,7 @@ Uso de cada variable:
 | `DIRECT_URL` | Conexion directa Prisma cuando aplique. |
 | `SUPABASE_URL` | URL del proyecto Supabase. |
 | `SUPABASE_ANON_KEY` | Puede usarse para conseguir tokens de prueba contra Supabase Auth. |
-| `SUPABASE_SERVICE_ROLE_KEY` | Uso exclusivo backend para Supabase Storage privado. Nunca usar en frontend. |
-| `SUPABASE_JWT_SECRET` | Verificacion local de JWT en `SupabaseAuthGuard`. |
+| `SUPABASE_SERVICE_ROLE_KEY` | Uso exclusivo backend para Supabase Auth/Storage privado. Nunca usar en frontend. |
 
 Variables locales recomendadas para probar con `curl`:
 
@@ -360,11 +358,11 @@ Falta el header:
 
 ### 401 Invalid or expired token
 
-El token expiro, esta mal copiado o no corresponde al `SUPABASE_JWT_SECRET` configurado en backend. Pide un token nuevo a Supabase Auth.
+El token expiro, esta mal copiado o Supabase Auth no lo reconoce. Pide un token nuevo a Supabase Auth.
 
 ### 401 Supabase auth is not configured
 
-Falta `SUPABASE_JWT_SECRET` en el entorno del backend.
+Falta `SUPABASE_URL` o una clave Supabase de backend (`SUPABASE_SERVICE_ROLE_KEY` o `SUPABASE_ANON_KEY`) en el entorno.
 
 ### 404 Note not found
 
