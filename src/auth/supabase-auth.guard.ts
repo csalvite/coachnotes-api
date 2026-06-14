@@ -6,7 +6,15 @@ import {
 } from '@nestjs/common';
 import { createClient } from '@supabase/supabase-js';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import WebSocket from 'ws';
 import type { AuthenticatedRequest } from './authenticated-request';
+
+type SupabaseClientOptions = NonNullable<Parameters<typeof createClient>[2]>;
+type RealtimeTransport = NonNullable<
+  NonNullable<SupabaseClientOptions['realtime']>['transport']
+>;
+
+const webSocketTransport = WebSocket as unknown as RealtimeTransport;
 
 @Injectable()
 export class SupabaseAuthGuard implements CanActivate {
@@ -57,6 +65,9 @@ export class SupabaseAuthGuard implements CanActivate {
       auth: {
         autoRefreshToken: false,
         persistSession: false,
+      },
+      realtime: {
+        transport: webSocketTransport,
       },
     });
 
