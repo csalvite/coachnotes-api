@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateNoteDto } from './dto/create-note.dto';
+import { GetNotesQueryDto } from './dto/get-notes-query.dto';
 import { UpdateNoteDto } from './dto/update-note.dto';
 
 @Injectable()
@@ -24,18 +25,32 @@ export class NotesService {
     return this.toResponse(note);
   }
 
-  async findAll(userId: string) {
-    const notes = await this.prisma.notes.findMany({
-      where: {
-        user_id: userId,
-        is_archived: false,
-      },
-      orderBy: {
-        created_at: 'desc',
-      },
-    });
+  async findAll(userId: string, query: GetNotesQueryDto) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const where = this.buildFindAllWhere(userId, query);
 
-    return notes.map((note) => this.toResponse(note));
+    const [notes, total] = await this.prisma.$transaction([
+      this.prisma.notes.findMany({
+        where,
+        orderBy: {
+          created_at: 'desc',
+        },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.notes.count({ where }),
+    ]);
+
+    return {
+      data: notes.map((note) => this.toResponse(note)),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   }
 
   async findOne(id: string, userId: string) {
@@ -103,6 +118,40 @@ export class NotesService {
     }
 
     return note;
+  }
+
+  private buildFindAllWhere(userId: string, query: GetNotesQueryDto) {
+    const where: Prisma.notesWhereInput = {
+      user_id: userId,
+      is_archived: query.isArchived ?? false,
+    };
+
+    if (query.sourceType) {
+      where.source_type = query.sourceType;
+    }
+
+    if (query.isFavorite !== undefined) {
+      where.is_favorite = query.isFavorite;
+    }
+
+    if (query.from || query.to) {
+      where.created_at = {
+        gte: query.from,
+        lte: query.to,
+      };
+    }
+
+    const search = query.search?.trim();
+
+    if (search) {
+      where.OR = [
+        { title: { contains: search, mode: 'insensitive' } },
+        { raw_content: { contains: search, mode: 'insensitive' } },
+        { clean_content: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    return where;
   }
 
   private toResponse(note: Prisma.notesGetPayload<object>) {

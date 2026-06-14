@@ -9,12 +9,14 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
 import type { AuthenticatedRequest } from '../auth/authenticated-request';
 import { SupabaseAuthGuard } from '../auth/supabase-auth.guard';
 import { CreateNoteDto } from './dto/create-note.dto';
+import { GetNotesQueryDto } from './dto/get-notes-query.dto';
 import { UpdateNoteDto } from './dto/update-note.dto';
 import { NotesService } from './notes.service';
 
@@ -32,8 +34,11 @@ export class NotesController {
   }
 
   @Get()
-  findAll(@Req() request: AuthenticatedRequest) {
-    return this.notesService.findAll(request.user.id);
+  findAll(
+    @Req() request: AuthenticatedRequest,
+    @Query() query: GetNotesQueryDto,
+  ) {
+    return this.notesService.findAll(request.user.id, query);
   }
 
   @Get(':id')
