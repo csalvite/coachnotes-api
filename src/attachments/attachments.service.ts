@@ -10,6 +10,7 @@ import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 
 type AttachmentType = 'IMAGE' | 'AUDIO' | 'VIDEO';
+const SIGNED_URL_EXPIRES_IN_SECONDS = 60 * 60;
 
 interface AttachmentStorage {
   type: AttachmentType;
@@ -73,7 +74,11 @@ export class AttachmentsService {
       },
     });
 
-    return attachments.map((attachment) => this.toResponse(attachment));
+    return Promise.all(
+      attachments.map(async (attachment) =>
+        this.toResponse(attachment, await this.createSignedUrl(attachment)),
+      ),
+    );
   }
 
   async remove(noteId: string, attachmentId: string, userId: string) {
@@ -187,12 +192,35 @@ export class AttachmentsService {
     return this.supabase;
   }
 
-  private toResponse(attachment: Prisma.note_attachmentsGetPayload<object>) {
+  private async createSignedUrl(
+    attachment: Prisma.note_attachmentsGetPayload<object>,
+  ) {
+    try {
+      const bucket = this.bucketForType(attachment.type);
+      const { data, error } = await this.getSupabase()
+        .storage.from(bucket)
+        .createSignedUrl(attachment.url, SIGNED_URL_EXPIRES_IN_SECONDS);
+
+      if (error) {
+        return null;
+      }
+
+      return data.signedUrl;
+    } catch {
+      return null;
+    }
+  }
+
+  private toResponse(
+    attachment: Prisma.note_attachmentsGetPayload<object>,
+    signedUrl: string | null = null,
+  ) {
     return {
       id: attachment.id,
       noteId: attachment.note_id,
       type: attachment.type,
       path: attachment.url,
+      signedUrl,
       fileName: attachment.file_name,
       mimeType: attachment.mime_type,
       fileSize: attachment.file_size ? Number(attachment.file_size) : null,
