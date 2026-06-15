@@ -10,7 +10,10 @@ import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 
 type AttachmentType = 'IMAGE' | 'AUDIO' | 'VIDEO';
+type TranscriptionResponse = { text?: unknown };
+
 const SIGNED_URL_EXPIRES_IN_SECONDS = 60 * 60;
+const OPENAI_TRANSCRIPTION_MODEL = 'gpt-4o-transcribe';
 
 interface AttachmentStorage {
   type: AttachmentType;
@@ -52,6 +55,7 @@ export class AttachmentsService {
         file_name: file.originalname,
         mime_type: file.mimetype,
         file_size: BigInt(file.size),
+        transcription_status: storage.type === 'AUDIO' ? 'PENDING' : undefined,
         metadata: {
           bucket: storage.bucket,
           path,
@@ -59,7 +63,52 @@ export class AttachmentsService {
       },
     });
 
+    if (storage.type === 'AUDIO') {
+      this.scheduleAudioTranscription(attachment.id);
+    }
+
     return this.toResponse(attachment);
+  }
+
+  async processAudioTranscription(attachmentId: string) {
+    const attachment = await this.prisma.note_attachments.findUnique({
+      where: {
+        id: attachmentId,
+      },
+    });
+
+    if (!attachment || attachment.type !== 'AUDIO') {
+      return;
+    }
+
+    try {
+      await this.prisma.note_attachments.update({
+        where: {
+          id: attachment.id,
+        },
+        data: {
+          transcription_status: 'PROCESSING',
+        },
+      });
+
+      const audio = await this.downloadAudio(attachment);
+      const transcription = await this.transcribeAudio(
+        audio,
+        attachment.file_name,
+      );
+
+      await this.prisma.note_attachments.update({
+        where: {
+          id: attachment.id,
+        },
+        data: {
+          transcription,
+          transcription_status: 'COMPLETED',
+        },
+      });
+    } catch {
+      await this.markTranscriptionFailed(attachmentId);
+    }
   }
 
   async findAll(noteId: string, userId: string) {
@@ -192,6 +241,76 @@ export class AttachmentsService {
     return this.supabase;
   }
 
+  private scheduleAudioTranscription(attachmentId: string) {
+    setImmediate(() => {
+      void this.processAudioTranscription(attachmentId).catch(() => undefined);
+    });
+  }
+
+  private async downloadAudio(
+    attachment: Prisma.note_attachmentsGetPayload<object>,
+  ) {
+    const { data, error } = await this.getSupabase()
+      .storage.from(this.bucketForType(attachment.type))
+      .download(attachment.url);
+
+    if (error || !data) {
+      throw new Error('Could not download audio attachment');
+    }
+
+    return data;
+  }
+
+  private async transcribeAudio(audio: Blob, fileName: string | null) {
+    const apiKey = process.env.OPENAI_API_KEY;
+
+    if (!apiKey) {
+      throw new Error('OpenAI is not configured');
+    }
+
+    const formData = new FormData();
+    formData.append('model', OPENAI_TRANSCRIPTION_MODEL);
+    formData.append('file', audio, fileName ?? 'audio');
+
+    const response = await fetch(
+      'https://api.openai.com/v1/audio/transcriptions',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: formData,
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error('OpenAI transcription failed');
+    }
+
+    const result = (await response.json()) as TranscriptionResponse;
+
+    if (typeof result.text !== 'string') {
+      throw new Error('OpenAI transcription response is invalid');
+    }
+
+    return result.text;
+  }
+
+  private async markTranscriptionFailed(attachmentId: string) {
+    try {
+      await this.prisma.note_attachments.update({
+        where: {
+          id: attachmentId,
+        },
+        data: {
+          transcription_status: 'FAILED',
+        },
+      });
+    } catch {
+      return;
+    }
+  }
+
   private async createSignedUrl(
     attachment: Prisma.note_attachmentsGetPayload<object>,
   ) {
@@ -224,6 +343,8 @@ export class AttachmentsService {
       fileName: attachment.file_name,
       mimeType: attachment.mime_type,
       fileSize: attachment.file_size ? Number(attachment.file_size) : null,
+      transcription: attachment.transcription,
+      transcriptionStatus: attachment.transcription_status,
       metadata: attachment.metadata,
       createdAt: attachment.created_at,
     };
